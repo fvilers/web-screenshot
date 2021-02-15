@@ -29,50 +29,46 @@ function downloadImage(data: string, fileName: string): void {
 }
 
 function App() {
-  const [error, setError] = useState("");
+  const [error, setError] = useState<Error>();
   const handleScreenshot = async () => {
-    setError("");
-
-    if (navigator.mediaDevices.getDisplayMedia === undefined) {
-      setError(
-        "Browser does not support 'navigator.mediaDevices.getDisplayMedia()'"
-      );
-      return;
-    }
-
-    let stream: MediaStream;
+    setError(undefined);
 
     try {
-      stream = await navigator.mediaDevices.getDisplayMedia();
+      if (navigator.mediaDevices.getDisplayMedia === undefined) {
+        throw new Error(
+          "Browser does not support 'navigator.mediaDevices.getDisplayMedia()'"
+        );
+      }
+
+      const stream = await navigator.mediaDevices.getDisplayMedia();
+      const { width, height } = getDimension(stream);
+      const video = document.createElement("video");
+
+      video.addEventListener(
+        "canplay",
+        () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+
+          const context = canvas.getContext("2d")!;
+          context.drawImage(video, 0, 0, width, height);
+
+          downloadImage(canvas.toDataURL(), "screenshot.png");
+
+          stream.getTracks().forEach((track) => track.stop());
+          video.srcObject = null;
+        },
+        { once: true }
+      );
+      video.width = width;
+      video.height = height;
+      video.autoplay = true;
+      video.srcObject = stream;
     } catch (error) {
-      setError(error.message);
-      return;
+      console.error(error);
+      setError(error);
     }
-
-    const { width, height } = getDimension(stream);
-    const video = document.createElement("video");
-
-    video.addEventListener(
-      "canplay",
-      () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-
-        const context = canvas.getContext("2d")!;
-        context.drawImage(video, 0, 0, width, height);
-
-        downloadImage(canvas.toDataURL(), "screenshot.png");
-
-        stream.getTracks().forEach((track) => track.stop());
-        video.srcObject = null;
-      },
-      { once: true }
-    );
-    video.width = width;
-    video.height = height;
-    video.autoplay = true;
-    video.srcObject = stream;
   };
 
   return (
@@ -87,7 +83,12 @@ function App() {
       </p>
 
       <div className="controls">
-        {error && <p className="error">{error}</p>}
+        {error && (
+          <p className="error">
+            {error.name} &rarr; {error.message}
+            {error.stack && <pre>{error.stack}</pre>}
+          </p>
+        )}
         <p>
           <button onClick={handleScreenshot}>Take screenshot</button>
         </p>
