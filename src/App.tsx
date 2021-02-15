@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 declare global {
   interface MediaDevices {
@@ -29,26 +29,46 @@ function downloadImage(data: string, fileName: string): void {
 }
 
 function App() {
+  const [error, setError] = useState("");
   const handleScreenshot = async () => {
-    const stream = await navigator.mediaDevices.getDisplayMedia();
+    setError("");
+
+    if (navigator.mediaDevices.getDisplayMedia === undefined) {
+      setError(
+        "Browser does not support 'navigator.mediaDevices.getDisplayMedia()'"
+      );
+      return;
+    }
+
+    let stream: MediaStream;
+
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia();
+    } catch (error) {
+      setError(error.message);
+      return;
+    }
+
     const { width, height } = getDimension(stream);
     const video = document.createElement("video");
-    const handlePlay = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
 
-      const context = canvas.getContext("2d")!;
-      context.drawImage(video, 0, 0, width, height);
+    video.addEventListener(
+      "canplay",
+      () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
 
-      downloadImage(canvas.toDataURL(), "screenshot.png");
+        const context = canvas.getContext("2d")!;
+        context.drawImage(video, 0, 0, width, height);
 
-      stream.getTracks().forEach((track) => track.stop());
-      video.srcObject = null;
-      video.removeEventListener("canplay", handlePlay);
-    };
+        downloadImage(canvas.toDataURL(), "screenshot.png");
 
-    video.addEventListener("canplay", handlePlay);
+        stream.getTracks().forEach((track) => track.stop());
+        video.srcObject = null;
+      },
+      { once: true }
+    );
     video.width = width;
     video.height = height;
     video.autoplay = true;
@@ -66,9 +86,12 @@ function App() {
         architecto perferendis iste vel commodi.
       </p>
 
-      <p className="controls">
-        <button onClick={handleScreenshot}>Take screenshot</button>
-      </p>
+      <div className="controls">
+        {error && <p className="error">{error}</p>}
+        <p>
+          <button onClick={handleScreenshot}>Take screenshot</button>
+        </p>
+      </div>
     </main>
   );
 }
