@@ -28,43 +28,47 @@ function downloadImage(data: string, fileName: string): void {
   a.click();
 }
 
+async function takeScreenshot(fileName: string): Promise<void> {
+  if (navigator.mediaDevices.getDisplayMedia === undefined) {
+    throw new Error(
+      "Browser does not support 'navigator.mediaDevices.getDisplayMedia()'"
+    );
+  }
+
+  const stream = await navigator.mediaDevices.getDisplayMedia();
+  const { width, height } = getDimension(stream);
+  const video = document.createElement("video");
+
+  video.addEventListener(
+    "canplay",
+    () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const context = canvas.getContext("2d")!;
+      context.drawImage(video, 0, 0, width, height);
+
+      downloadImage(canvas.toDataURL(), fileName);
+
+      stream.getTracks().forEach((track) => track.stop());
+      video.srcObject = null;
+    },
+    { once: true }
+  );
+  video.width = width;
+  video.height = height;
+  video.autoplay = true;
+  video.srcObject = stream;
+}
+
 function App() {
   const [error, setError] = useState<Error>();
   const handleScreenshot = async () => {
     setError(undefined);
 
     try {
-      if (navigator.mediaDevices.getDisplayMedia === undefined) {
-        throw new Error(
-          "Browser does not support 'navigator.mediaDevices.getDisplayMedia()'"
-        );
-      }
-
-      const stream = await navigator.mediaDevices.getDisplayMedia();
-      const { width, height } = getDimension(stream);
-      const video = document.createElement("video");
-
-      video.addEventListener(
-        "canplay",
-        () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-
-          const context = canvas.getContext("2d")!;
-          context.drawImage(video, 0, 0, width, height);
-
-          downloadImage(canvas.toDataURL(), "screenshot.png");
-
-          stream.getTracks().forEach((track) => track.stop());
-          video.srcObject = null;
-        },
-        { once: true }
-      );
-      video.width = width;
-      video.height = height;
-      video.autoplay = true;
-      video.srcObject = stream;
+      await takeScreenshot("screenshot.png");
     } catch (error) {
       console.error(error);
       setError(error);
