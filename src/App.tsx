@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 
 declare global {
+  interface MediaTrackConstraints {
+    cursor: "always" | "motion" | "never";
+  }
+
   interface MediaDevices {
     getDisplayMedia(constraints?: MediaStreamConstraints): Promise<MediaStream>;
   }
@@ -35,7 +39,12 @@ async function takeScreenshot(fileName: string): Promise<void> {
     );
   }
 
-  const stream = await navigator.mediaDevices.getDisplayMedia();
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    audio: false,
+    video: {
+      cursor: "never",
+    },
+  });
   const { width, height } = getDimension(stream);
   const video = document.createElement("video");
 
